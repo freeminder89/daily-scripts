@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>百度关键词监控</title>
+    <script src="http://cdn.bootcss.com/jquery/1.12.4/jquery.js"></script>
+    <link href="http://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+<style>
+    td.error {
+        color: red;
+    }
+
+    td.hit {
+        color: orange;
+    }
+
+    td.ad {
+        color: green;
+    }
+</style>
+<div class="container">
+    <textarea id="keywords" type="text" placeholder="输入关键词列表" style="width: 500px;" rows="10"></textarea>
+    <br>
+    <input type="text" placeholder="规则" style="width: 150px;margin-right: 30px;line-height: 34px" id="rule">
+    <button id="search" class="btn btn-primary">GO</button>
+    <br><br>
+    <table id="result" class="table table-bordered table-striped table-hover" style="width: 600px">
+        <thead>
+        <tr>
+            <th style="width: 50%">关键词</th>
+            <th>结果</th>
+        </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+</div>
+<script>
+    function iframeLoaded(frame) {
+        var $frame = $(frame);
+        var word = $frame.attr("word");
+        var result = undefined;
+        var ad = false;
+        var RULE = new RegExp($("#rule").val());
+        $frame.contents().find("#content_left>div").each(function (idx, obj) {
+            var $obj = $(obj);
+            if (RULE.test($(obj).find('a').text())) {
+                if (/visibility:visible\s*!important/.test($obj.attr("style"))) {
+                    ad = true;
+                }
+                result = idx;
+                return false;
+            }
+        });
+        result = result === undefined ? "未找到" : ((ad ? "广告" : "普通") + ++result);
+        $("#result").find("tr[word=" + word + "] td").text(result)
+                .toggleClass("error", result == "未找到")
+                .toggleClass("ad", ad)
+                .toggleClass("hit", result != "未找到");
+    }
+    $(function () {
+        var frameTemplate = '<iframe frameborder="0" onload="iframeLoaded(this)" width="0" height="0"></iframe>';
+        var resultTemplate = "<tr><th></th><td>获取中</td></tr>";
+
+        $("#keywords").val(localStorage.getItem('keywords') || "");
+        $("#rule").val(localStorage.getItem('searchRule') || "");
+        $("#search").click(function () {
+            var keywords = $("#keywords").val();
+            if (!keywords) {
+                alert("没有检测到输入关键词");
+                return;
+            }
+            localStorage.setItem('keywords', keywords);
+            localStorage.setItem('searchRule', $("#rule").val());
+            keywords = keywords.split(/\s+/);
+            var $result = $("#result tbody");
+            $result.empty();
+            $("body iframe").remove();
+            $(keywords).each(function (idx, word) {
+                var $frame = $(frameTemplate);
+                var searchUrl = "https://www.baidu.com/s?wd=" + encodeURIComponent(word);
+                $frame.attr("src", searchUrl).attr("word", word);
+                var $row = $(resultTemplate);
+                $row.find("th").html('<a target="_blank" href="' +
+                        searchUrl + '">' + word + '</a>');
+                $row.attr("word", word);
+                $result.append($row);
+                $("body").append($frame);
+            })
+        });
+    });
+</script>
+</body>
+</html>

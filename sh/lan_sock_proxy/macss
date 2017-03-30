@@ -1,0 +1,19 @@
+#!/bin/sh
+lan_ip_rule="172"
+pac_address="http://0.0.0.0/proxy.pac"
+networksetup -listallnetworkservices |grep -v "An asterisk" |while read line
+do 
+    networksetup -getinfo "$line" |grep "IP address: $lan_ip_rule"
+    [[ $? != 0 ]] && continue
+    echo "config $line"
+    enable=`networksetup -getautoproxyurl "$line"|grep "Enabled"`
+    if [[ "$enable" == "Enabled: No" ]];then
+    echo "开启代理"
+    sudo networksetup -setautoproxyurl "$line" $pac_address
+    else
+    echo "关闭代理"
+    sudo networksetup -setautoproxystate "$line" off
+    fi
+    exit
+done
+
