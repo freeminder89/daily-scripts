@@ -4,12 +4,15 @@
     <meta charset="UTF-8">
     <title>百度关键词监控</title>
     <script src="http://cdn.bootcss.com/jquery/1.12.4/jquery.js"></script>
+    <script src="http://cdn.bootcss.com/store.js/1.3.20/store.js"></script>
     <link href="http://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
 <style>
     td.error {
         color: red;
+        cursor: pointer;
+        text-decoration: underline;
     }
 
     td.hit {
@@ -19,34 +22,90 @@
     td.ad {
         color: green;
     }
+
+    table {
+        table-layout: fixed;
+    }
+
+    tbody th {
+        color: #337ab7;
+        cursor: pointer;
+    }
+
+    .frame-container {
+        position: fixed;
+        width: 48%;
+        right: 0;
+        top: 0;
+        height: 100%;
+    }
 </style>
 <div class="container">
-    <textarea id="keywords" type="text" placeholder="输入关键词列表" style="width: 500px;" rows="10"></textarea>
-    <br>
-    <input type="text" placeholder="规则" style="width: 150px;margin-right: 30px;line-height: 34px" id="rule">
-    <button id="search" class="btn btn-primary">GO</button>
-    <br><br>
-    <table id="result" class="table table-bordered table-striped table-hover" style="width: 600px">
-        <thead>
-        <tr>
-            <th style="width: 50%">关键词</th>
-            <th>结果</th>
-        </tr>
-        </thead>
-        <tbody>
-        </tbody>
-    </table>
+    <div class="row">
+        <div class="col-sm-6">
+            <textarea id="keywords" type="text" placeholder="输入关键词列表" style="width: 100%;" rows="10"></textarea>
+            <button id="search" class="btn btn-primary btn-lg">GO</button>
+            <table id="result" class="table table-bordered table-striped table-hover">
+                <thead>
+                <tr>
+                    <th>关键词</th>
+                    <th>结果</th>
+                    <th>上次</th>
+                    <th>趋势</th>
+                </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+        <div class="col-sm-6 frame-container">
+
+        </div>
+    </div>
 </div>
 <script>
+    store.set("pre_result", store.get("pre_result") || {});
+    function setWordPreResult(word, result) {
+        var preResult = store.get("pre_result");
+        preResult[word] = result;
+        store.set("pre_result", preResult);
+    }
+    function getWordPreResult(word) {
+        return store.get("pre_result")[word] || "首次运行";
+    }
+
+    function findWordFrame(word) {
+        return $(".frame-container iframe[word=" + word + "]");
+    }
+    function updateResultTrend($row) {
+        var pre = $row.find(".pre").text();
+        var now = $row.find(".now").text();
+        var $trend = $row.find(".trend");
+        if (pre == "首次运行") {
+            $trend.text("");
+        } else if (pre == now) {
+            $trend.text("");
+        } else if (pre == "未找到") {
+            $trend.text("⬆");
+        } else if (now == "未找到") {
+            $trend.text("⬇");
+        } else {
+            pre = parseInt(/\d+/.exec(pre)[0]);
+            now = parseInt(/\d+/.exec(now)[0]);
+            $trend.text(pre > now ? "⬆" : "⬇");
+        }
+        var $text = $trend.text();
+        $trend.toggleClass("bg-success", $text == "⬆")
+                .toggleClass("bg-danger", $text == "⬇");
+    }
     function iframeLoaded(frame) {
         var $frame = $(frame);
         var word = $frame.attr("word");
         var result = undefined;
         var ad = false;
-        var RULE = new RegExp($("#rule").val());
         $frame.contents().find("#content_left>div").each(function (idx, obj) {
             var $obj = $(obj);
-            if (RULE.test($(obj).find('a').text())) {
+            if (/www.yourhostname.com/.test($(obj).find('a').text())) {
                 if (/visibility:visible\s*!important/.test($obj.attr("style"))) {
                     ad = true;
                 }
@@ -55,40 +114,71 @@
             }
         });
         result = result === undefined ? "未找到" : ((ad ? "广告" : "普通") + ++result);
-        $("#result").find("tr[word=" + word + "] td").text(result)
+        setWordPreResult(word, result);
+        var $row = $("#result").find("tr[word=" + word + "]");
+        $row.find("td.now").text(result)
                 .toggleClass("error", result == "未找到")
                 .toggleClass("ad", ad)
                 .toggleClass("hit", result != "未找到");
+        updateResultTrend($row);
     }
     $(function () {
         var frameTemplate = '<iframe frameborder="0" onload="iframeLoaded(this)" width="0" height="0"></iframe>';
-        var resultTemplate = "<tr><th></th><td>获取中</td></tr>";
-
-        $("#keywords").val(localStorage.getItem('keywords') || "");
-        $("#rule").val(localStorage.getItem('searchRule') || "");
+        var resultTemplate = "<tr><th></th><td class='now'>获取中</td><td class='pre'></td><td class='trend'></td></tr>";
+        $("#keywords").val(store.get('keywords') || "");
         $("#search").click(function () {
             var keywords = $("#keywords").val();
             if (!keywords) {
                 alert("没有检测到输入关键词");
                 return;
             }
-            localStorage.setItem('keywords', keywords);
-            localStorage.setItem('searchRule', $("#rule").val());
+            store.set('keywords', keywords);
             keywords = keywords.split(/\s+/);
             var $result = $("#result tbody");
             $result.empty();
-            $("body iframe").remove();
+            $(".frame-container iframe").remove();
             $(keywords).each(function (idx, word) {
                 var $frame = $(frameTemplate);
                 var searchUrl = "https://www.baidu.com/s?wd=" + encodeURIComponent(word);
                 $frame.attr("src", searchUrl).attr("word", word);
                 var $row = $(resultTemplate);
-                $row.find("th").html('<a target="_blank" href="' +
-                        searchUrl + '">' + word + '</a>');
+                $row.find("th").text(word);
+                $row.find("td.pre").text(getWordPreResult(word));
                 $row.attr("word", word);
                 $result.append($row);
-                $("body").append($frame);
+                $(".frame-container").append($frame);
             })
+        });
+        $("#result").on("click", "tbody th", function (e) {
+            var $row = $(e.currentTarget).closest('tr');
+            var word = $row.attr("word");
+            var result = $row.find("td.now").text();
+            var hitIndex = undefined;
+            if (result == "获取中") {
+                return;
+            }
+            if (result != "未找到") {
+                hitIndex = parseInt(/\d+/.exec(result)[0]);
+            }
+            $(".frame-container").find("iframe").attr("width", "0").attr("height", "0");
+            var $frame = findWordFrame(word);
+            $frame.attr("width", "100%").attr("height", "800px");
+            if (hitIndex !== undefined) {
+                $frame = $frame.contents();
+                var $hit = $frame.find("#content_left>div:nth-of-type(" + hitIndex + ")");
+                $hit.css("border", "3px solid red");
+                $frame.find("body")
+                        .scrollTop($hit.offset().top - 120);
+            }
+        }).on("click", "td.error", function (e) {
+            var $row = $(e.currentTarget).closest('tr');
+            var word = $row.attr("word");
+            var result = $row.find("td.now").text();
+            $row.find("td.pre").text(result);
+            $row.find("td.now").text("重试中");
+            setWordPreResult(word, result);
+            var $frame = findWordFrame(word);
+            $frame.attr("src", $frame.attr("src"));
         });
     });
 </script>
