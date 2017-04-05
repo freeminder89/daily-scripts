@@ -9,3 +9,4 @@
 
 * [关闭cros的chrome浏览器](sh/chrome_runner)
 * [局域网pac代理设置脚本](sh/lan_pac_setter)
+* [mysqldiff](sh/mysqldiff)
