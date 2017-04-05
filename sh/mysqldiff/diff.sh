@@ -8,7 +8,7 @@ params in config file:
     export PATH to include mysql and mysqldiff
 connention params file:
     whatever after command mysql, include the db name at the end
-    worker.conn remove the db name, add a space between -p and password
+    worker.conn remove the db name, add a space between config and value
 patch:
     set patch to apply diff result
 "
@@ -47,9 +47,9 @@ do_patch
 fi
 src_sql_file=src.dump.sql
 dst_sql_file=dst.dump.sql
-echo "---------dump src $1 结构------------------"
+echo "---------dump src 结构------------------"
 dumpsql "$src" $src_sql_file 
-echo "---------dump dst $2 结构------------------"
+echo "---------dump dst 结构------------------"
 dumpsql "$dst" $dst_sql_file 
 if [[ -f $src_sql_file && -f $dst_sql_file ]];then
     echo "------------------对比sql结构--------------------"
